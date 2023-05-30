@@ -1,9 +1,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
 from torchvision.models import vgg19
 import math
-
+import torch
+from torch import autograd
 
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -13,6 +13,31 @@ class FeatureExtractor(nn.Module):
 
     def forward(self, img):
         return self.vgg19_54(img)
+
+
+def gradient_penalty(discriminator, real_data, fake_data):
+    """
+    # Assume `real_data` and `fake_data` are available
+    gradient_penalty_value = gradient_penalty(discriminator, real_data, fake_data)
+    discriminator_loss = discriminator_loss + lambda_gp * gradient_penalty_value
+    """
+    alpha = torch.rand(real_data.size(0), 1, 1, 1).to(real_data.device)
+    interpolated = alpha * real_data + (1 - alpha) * fake_data
+    interpolated.requires_grad_(True)
+
+    scores = discriminator(interpolated)
+
+    gradients = autograd.grad(
+        inputs=interpolated,
+        outputs=scores,
+        grad_outputs=torch.ones_like(scores),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
 
 
 class DenseResidualBlock(nn.Module):
@@ -115,7 +140,7 @@ class Discriminator(nn.Module):
 
         layers = []
         in_filters = in_channels
-        for i, out_filters in enumerate([64, 128, 256, 512]):
+        for i, out_filters in enumerate([64, 64, 64, 64]): #maybe lower the ability of D (was 64,128,256,512)
             layers.extend(discriminator_block(in_filters, out_filters, first_block=(i == 0)))
             in_filters = out_filters
 

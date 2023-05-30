@@ -5,8 +5,9 @@ import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-from PIL import Image
+from PIL import Image, ImageFilter
 import torchvision.transforms as transforms
+from sharpenTool import sharpen_image_with_unsharp_mask_PIL
 
 # Normalization parameters for pre-trained PyTorch models
 mean = np.array([0.485, 0.456, 0.406])
@@ -43,6 +44,8 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, index):
         img = Image.open(self.files[index % len(self.files)])
+        # img = img.filter(ImageFilter.EDGE_ENHANCE)
+        img = sharpen_image_with_unsharp_mask_PIL(img)
         img_lr = self.lr_transform(img)
         img_hr = self.hr_transform(img)
 
