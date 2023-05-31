@@ -20,7 +20,7 @@ mean = np.array([0.485, 0.456, 0.406])
 std = np.array([0.229, 0.224, 0.225])
 
 
-root_path = 'C:/Users/hlia981/mmdetection/ESRGAN/'
+root_path = 'C:/Users/hlia981/mmdetection/Edge-Enhanced SRGAN/'
 
 
 def bgr_to_rgb(image):
@@ -41,34 +41,39 @@ def lrTransform(image):
     return img_lr
 
 
-def load_all_image(path):
+def load_specific_size_image(path, number=2):
     image_list = []
     for filename in glob.glob(path + '/*.jpg'):  # assuming gif
         im = Image.open(filename)
         image_list.append(im)
+        if len(image_list) >= number:
+            break
     return image_list
 
 
 if __name__ == '__main__':
-    img_list = load_all_image(
-        path="C:/Users/hlia981/Downloads/Linnaeus 5 256X256/Linnaeus 5 256X256/train/small_dataset")
-    i = 0
-    os.makedirs(root_path+"data", exist_ok=True)
-    for img in img_list:
-        i += 1
+    img_list = load_specific_size_image(
+        path="C:/Users/hlia981/Downloads/Linnaeus 5 256X256/Linnaeus 5 256X256/test/other")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    os.makedirs(root_path+"sharpen_data", exist_ok=True)
+    generator = GeneratorRRDB(3, filters=64, num_res_blocks=23).to(device)
+    discriminator = Discriminator(input_shape=(3, 256, 256)).to(device)
+    # if torch.cuda.is_available():
+    #     generator = generator.cuda()
+
+    generator.load_state_dict(torch.load(root_path + "new_saved_models/generator_88.pth"))
+    print("loading model weight")
+    for i, img in enumerate(img_list):
         trans = transforms.ToPILImage()
         # img = Image.open(root_path+'data/121_256.jpg')
 
         img_lr = lrTransform(img)
-        img_lr = Variable(img_lr.type(torch.cuda.FloatTensor))
+        img_lr = Variable(img_lr.type(torch.FloatTensor))
 
-        generator = GeneratorRRDB(3, filters=64, num_res_blocks=23)
-        if torch.cuda.is_available():
-            generator = generator.cuda()
-
-        generator.load_state_dict(torch.load(root_path + "saved_models/generator_53.pth"))
-        print("loading model weight")
         gen_hr = generator(img_lr)
+        output, _ = discriminator(gen_hr)
+        print(output.shape)
+        print(output.size)
         img_lr = nn.functional.interpolate(img_lr, scale_factor=4)
         gen_hr = make_grid(gen_hr, nrow=1, normalize=True)
         img_lr = make_grid(img_lr, nrow=1, normalize=True)
@@ -78,21 +83,4 @@ if __name__ == '__main__':
         # x, y = box[0], box[1]
         # img_grid = trans(img_grid)
         # img_grid.show()
-        save_image(img_grid, root_path + f"data/new_gen{i}.png", normalize=True)
-
-    #
-    # gen_hr = bgr_to_rgb(gen_hr)
-    # img_grid = torch.cat((img_lr, gen_hr), -1)
-    # # print(img_grid.type(), img_grid.size())
-    #
-    # img_grid = trans(img_grid)
-    # img_grid.show()
-
-    # save_image(img_grid, root_path+"data/%d.png", normalize=False)
-
-    # trans = transforms.ToPILImage()
-    # gen_hr = trans(gen_hr)
-    # # print(gen_hr)
-    # gen_hr.show()
-
-    # B,G,R -> R,G,B
+        save_image(img_grid, root_path + f"sharpen_data/new_gen{i}.png", normalize=True)
